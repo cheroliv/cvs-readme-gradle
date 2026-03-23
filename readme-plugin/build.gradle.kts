@@ -33,12 +33,42 @@ dependencies {
     testImplementation(libs.kotlin.test.junit5)
     testImplementation(gradleTestKit())
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    implementation(kotlin("stdlib-jdk8"))
 }
+//dependencies {
+//
+//
+//    implementation(gradleApi())
+//    implementation(gradleKotlinDsl())
+//    implementation(libs.bundles.asciidoctor)
+//    implementation(libs.node.gradle)
+//
+//    api(libs.bundles.slider)
+//    api(libs.bundles.jgit)
+//    api(libs.commons.io)
+//
+//    // Coroutines - IMPORTANT for the asynchronous tests
+//    testImplementation(libs.bundles.coroutines)
+//
+//    testImplementation(kotlin("test-junit5"))
+//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+//    testImplementation(libs.slf4j)
+//    testRuntimeOnly(libs.logback)
+//
+//    testImplementation(libs.assertj.core)
+//    testImplementation(libs.mockito.kotlin)
+//    testImplementation(libs.mockito.junit.jupiter)
+//
+//    // Cucumber dependencies
+//    testImplementation(libs.bundles.cucumber)
+//}
+//
 
 val functionalTestSourceSet = sourceSets.create("functionalTest") {}
 
 configurations["functionalTestImplementation"]
     .extendsFrom(configurations["testImplementation"])
+
 configurations["functionalTestRuntimeOnly"]
     .extendsFrom(configurations["testRuntimeOnly"])
 
@@ -141,47 +171,6 @@ signing {
 //asciidoc-plantuml-readme
 
 
-//
-//repositories {
-//    mavenCentral()
-//    gradlePluginPortal()
-//    listOf(
-//        "https://repo.gradle.org/gradle/libs-releases/",
-//        "https://plugins.gradle.org/m2/",
-////        "https://maven.xillio.com/artifactory/libs-release/",
-//        "https://mvnrepository.com/repos/springio-plugins-release",
-//        "https://archiva-repository.apache.org/archiva/repository/public/"
-//    ).forEach(::maven)
-//}
-//
-//dependencies {
-//    implementation(kotlin("stdlib-jdk8"))
-//
-//    implementation(gradleApi())
-//    implementation(gradleKotlinDsl())
-//    implementation(libs.bundles.asciidoctor)
-//    implementation(libs.node.gradle)
-//
-//    api(libs.bundles.slider)
-//    api(libs.bundles.jgit)
-//    api(libs.commons.io)
-//
-//    // Coroutines - IMPORTANT for the asynchronous tests
-//    testImplementation(libs.bundles.coroutines)
-//
-//    testImplementation(kotlin("test-junit5"))
-//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-//    testImplementation(libs.slf4j)
-//    testRuntimeOnly(libs.logback)
-//
-//    testImplementation(libs.assertj.core)
-//    testImplementation(libs.mockito.kotlin)
-//    testImplementation(libs.mockito.junit.jupiter)
-//
-//    // Cucumber dependencies
-//    testImplementation(libs.bundles.cucumber)
-//}
-//
 //
 //tasks.withType<Test> {
 //    useJUnitPlatform()
