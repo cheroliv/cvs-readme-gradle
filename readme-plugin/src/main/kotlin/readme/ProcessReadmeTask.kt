@@ -29,6 +29,14 @@ abstract class ProcessReadmeTask : DefaultTask() {
         RegexOption.DOT_MATCHES_ALL
     )
 
+    // Regex : capture href="README_plantuml{_xx}.adoc" dans les blocs passthrough ++++
+    // Groupe 1 : tout ce qui précède le nom de fichier dans le href
+    // Groupe 2 : le nom du fichier _plantuml source (ex: README_plantuml_fr.adoc)
+    // Groupe 3 : tout ce qui suit dans la balise href
+    private val langLinkRegex = Regex(
+        """(href=")([^"]*README_plantuml(?:_[a-z]{2})?\.adoc)"""
+    )
+
     @TaskAction
     fun process() {
         val root = sourceDir.get().asFile
@@ -53,7 +61,8 @@ abstract class ProcessReadmeTask : DefaultTask() {
 
         var diagramCount = 0
 
-        val rewritten = plantUmlBlockRegex.replace(content) { match ->
+        // ── Étape 1 : remplacement des blocs PlantUML ─────────────────────
+        val afterPlantuml = plantUmlBlockRegex.replace(content) { match ->
             val name = match.groupValues[1].trim()
             val body = match.groupValues[3]
             diagramCount++
@@ -71,6 +80,23 @@ abstract class ProcessReadmeTask : DefaultTask() {
             "image::${relPath}[${name}]"
         }
 
+        // ── Étape 2 : réécriture des liens inter-langues ───────────────────
+        // README_plantuml.adoc     → href pointe vers README_plantuml_fr.adoc
+        //                            devient → href="README_fr.adoc"
+        // README_plantuml_fr.adoc  → href pointe vers README_plantuml.adoc
+        //                            devient → href="README.adoc"
+        val rewritten = langLinkRegex.replace(afterPlantuml) { match ->
+            val prefix = match.groupValues[1]  // 'href="'
+            val linkedSource = match.groupValues[2]  // ex: README_plantuml_fr.adoc
+
+            // Convertit le nom source _plantuml en nom de fichier généré
+            val generatedName = AdocSourceFile(File(linkedSource)).generatedFileName()
+
+            logger.lifecycle("║  LINK : $linkedSource → $generatedName")
+            "${prefix}${generatedName}"
+        }
+
+        // ── Étape 3 : écriture du fichier généré ──────────────────────────
         val generated = src.generatedFile()
         generated.writeText(rewritten)
 
@@ -82,7 +108,6 @@ abstract class ProcessReadmeTask : DefaultTask() {
         val src = if (body.trim().startsWith("@startuml")) body
         else "@startuml\n$body\n@enduml"
 
-        // ← SourceStringReader n'implémente pas Closeable — pas de .use{}
         val reader = SourceStringReader(src)
         val fos = FileOutputStream(output)
         try {
