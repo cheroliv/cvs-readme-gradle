@@ -1,5 +1,8 @@
+//pluginManagement.repositories.gradlePluginPortal()
+//pluginManagement.repositories.mavenLocal()
 pluginManagement.repositories {
     mavenLocal()
     gradlePluginPortal()
+    mavenCentral()
 }
-rootProject.name = "asciidoc-plantuml-readme-gradle"
+rootProject.name = "readme-gradle"
