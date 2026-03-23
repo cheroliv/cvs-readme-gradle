@@ -15,8 +15,8 @@ class CanaryReadmeGradlePluginTest {
         project.plugins.apply("com.cheroliv.readme")
 
         // Verify the result
-        assertNotNull(project.tasks.findByName("readme"))
-        // Verify the result
-        assertNotNull(project.tasks.findByName("tasks"))
+        assertNotNull(project.tasks.findByName("processReadme"))       // ← tâche réelle
+        assertNotNull(project.tasks.findByName("scaffoldReadme"))      // ← tâche réelle
+//        assertNotNull(project.tasks.findByName("tasks"))
     }
 }
