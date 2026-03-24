@@ -29,7 +29,7 @@ testcontainers-pg = "1.21.4"
 logback = "1.5.32"
 
 [libraries]
-plantuml = {module = "net.sourceforge.plantuml:plantuml",version.ref = "plantuml"}
+plantuml = { module = "net.sourceforge.plantuml:plantuml", version.ref = "plantuml" }
 asciidoctor-gradle-jvm-gems = { module = "org.asciidoctor:asciidoctor-gradle-jvm-gems", version.ref = "asciidoctor-gradle" }
 asciidoctor-gradle-jvm = { module = "org.asciidoctor:asciidoctor-gradle-jvm", version.ref = "asciidoctor-gradle" }
 asciidoctorj-diagram = { module = "org.asciidoctor:asciidoctorj-diagram", version.ref = "asciidoctorj-diagram" }
@@ -80,17 +80,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 publish = { id = "com.gradle.plugin-publish", version.ref = "plugin-publish" }
 
 [bundles]
-readme = [
-    "asciidoctorj-diagram-plantuml",
-    "asciidoctor-gradle-jvm-gems",
-    "asciidoctor-gradle-jvm",
-    "asciidoctorj-diagram",
-    "asciidoctorj-diagram-plantuml",
-    "jackson-module-kotlin",
-    "jackson-dataformat-yaml",
-    "arrow-core",
-    "arrow-coroutines",
-    "arrow-jackson",
+readme-ai = [
     "langchain4j",
     "langchain4j-ollama",
     "langchain4j-open-ai",
@@ -98,6 +88,21 @@ readme = [
     "langchain4j-mistral",
     "langchain4j-pgvector",
     "langchain4j-minilm",
+]
+readme-utils = [
+    "asciidoctorj-diagram-plantuml",
+    "asciidoctor-gradle-jvm-gems",
+    "asciidoctor-gradle-jvm",
+    "asciidoctorj-diagram",
+    "asciidoctorj-diagram-plantuml",
+]
+readme = [
+    "plantuml",
+    "jackson-module-kotlin",
+    "jackson-dataformat-yaml",
+    "arrow-core",
+    "arrow-coroutines",
+    "arrow-jackson",
     "docker-java",
     "docker-java-transport-httpclient5"
 ]
