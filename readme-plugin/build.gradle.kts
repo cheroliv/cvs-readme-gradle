@@ -34,22 +34,16 @@ dependencies {
     testImplementation(gradleTestKit())
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation(kotlin("stdlib-jdk8"))
-}
-//dependencies {
-//
-//
 //    implementation(gradleApi())
 //    implementation(gradleKotlinDsl())
-//    implementation(libs.bundles.asciidoctor)
+//    //TODO: propose-readme tasks IA based
+//    //TODO: readme to pdf/html/epub/md/xml/json/yaml
+//    implementation(libs.bundles.readme)
+//    //TODO: readme to html and serve
 //    implementation(libs.node.gradle)
-//
-//    api(libs.bundles.slider)
-//    api(libs.bundles.jgit)
-//    api(libs.commons.io)
-//
 //    // Coroutines - IMPORTANT for the asynchronous tests
 //    testImplementation(libs.bundles.coroutines)
-//
+
 //    testImplementation(kotlin("test-junit5"))
 //    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 //    testImplementation(libs.slf4j)
@@ -61,8 +55,8 @@ dependencies {
 //
 //    // Cucumber dependencies
 //    testImplementation(libs.bundles.cucumber)
-//}
-//
+}
+
 
 val functionalTestSourceSet = sourceSets.create("functionalTest") {}
 

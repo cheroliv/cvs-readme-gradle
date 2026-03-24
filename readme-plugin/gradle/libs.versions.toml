@@ -80,7 +80,8 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 publish = { id = "com.gradle.plugin-publish", version.ref = "plugin-publish" }
 
 [bundles]
-asciidoc-plantuml-readme = [
+readme = [
+    "asciidoctorj-diagram-plantuml",
     "asciidoctor-gradle-jvm-gems",
     "asciidoctor-gradle-jvm",
     "asciidoctorj-diagram",
