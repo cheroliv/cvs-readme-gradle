@@ -19,42 +19,35 @@ repositories {
 }
 
 dependencies {
-    // PlantUML — génération des PNG
-    implementation(libs.plantuml)
-
+    //TODO: propose-readme tasks IA based
+    //TODO: readme to pdf/html/epub/md/xml/json/yaml
+    implementation(libs.bundles.readme)
     // JGit — opérations Git sans binaire système (bundle toml)
     implementation(libs.bundles.jgit)
-
-    // Jackson — parsing du fichier readme-plantuml.yml
-    implementation(libs.jackson.dataformat.yaml)
-    implementation(libs.jackson.module.kotlin)
+    //TODO: readme to html and serve
+    implementation(libs.node.gradle)
 
     // Tests
     testImplementation(libs.kotlin.test.junit5)
     testImplementation(gradleTestKit())
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation(kotlin("stdlib-jdk8"))
-//    implementation(gradleApi())
-//    implementation(gradleKotlinDsl())
-//    //TODO: propose-readme tasks IA based
-//    //TODO: readme to pdf/html/epub/md/xml/json/yaml
-//    implementation(libs.bundles.readme)
-//    //TODO: readme to html and serve
-//    implementation(libs.node.gradle)
-//    // Coroutines - IMPORTANT for the asynchronous tests
-//    testImplementation(libs.bundles.coroutines)
+    implementation(gradleApi())
+    implementation(gradleKotlinDsl())
+    // Coroutines - IMPORTANT for the asynchronous tests
+    testImplementation(libs.bundles.coroutines)
 
-//    testImplementation(kotlin("test-junit5"))
-//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-//    testImplementation(libs.slf4j)
-//    testRuntimeOnly(libs.logback)
-//
-//    testImplementation(libs.assertj.core)
-//    testImplementation(libs.mockito.kotlin)
-//    testImplementation(libs.mockito.junit.jupiter)
-//
-//    // Cucumber dependencies
-//    testImplementation(libs.bundles.cucumber)
+    testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(libs.slf4j)
+    testRuntimeOnly(libs.logback)
+
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.mockito.junit.jupiter)
+
+    // Cucumber dependencies
+    testImplementation(libs.bundles.cucumber)
 }
 
 
@@ -76,7 +69,13 @@ gradlePlugin.testSourceSets.add(functionalTestSourceSet)
 
 tasks.named<Task>("check") { dependsOn(functionalTest) }
 
-tasks.named<Test>("test") { useJUnitPlatform() }
+tasks.withType<Test> {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+    }
+}
 
 gradlePlugin {
     website.set("https://cheroliv.com/")
@@ -161,19 +160,7 @@ signing {
 
 
 
-//////////////////////////////////////////
-//asciidoc-plantuml-readme
 
-
-//
-//tasks.withType<Test> {
-//    useJUnitPlatform()
-//    testLogging {
-//        events("passed", "skipped", "failed")
-//        showStandardStreams = true
-//    }
-//}
-//
 //tasks.named<Test>("test") {
 //    filter {
 //        // Exclure les classes dans le package 'com.cheroliv.slider.scenarios' (tests Cucumber)
