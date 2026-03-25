@@ -16,7 +16,7 @@ class ReadmePlantUmlConfigTest {
         assertEquals("en", config.source.defaultLang)
         assertEquals(".github/workflows/readmes/images", config.output.imgDir)
         assertEquals("github-actions[bot]", config.git.userName)
-        assertEquals(listOf("main", "master"), config.git.watchedBranches)
+        assertEquals(listOf("main"), config.git.watchedBranches)
     }
 
     @Test
@@ -31,6 +31,7 @@ class ReadmePlantUmlConfigTest {
             git:
               userName: "bot"
               userEmail: "bot@example.com"
+              repoUrl: "https://github.com/bot/app.git"
               commitMessage: "chore: regen [skip ci]"
               token: "ghp_test_token"
               watchedBranches:
