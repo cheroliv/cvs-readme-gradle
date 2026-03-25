@@ -40,6 +40,8 @@ Feature: Scaffold README configuration
       | git.userEmail        | github-actions[bot]@users.noreply.github.com               |
       | git.commitMessage    | chore: generate readme [skip ci]                           |
       | git.token            | <YOUR_GITHUB_PAT>                                          |
+      | git.repoUrl          | https://github.com/foo/bar.git                             |
+
     And the file "readme-truth.yml" should contain the following watched branches:
       | branch  |
       | main    |
