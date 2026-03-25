@@ -6,20 +6,25 @@ import org.gradle.api.tasks.*
 import java.io.File
 
 /**
- * Tâche de scaffolding — exécutée une seule fois au premier lancement.
+ * Scaffolding task — runs once on first launch, then validates config on every run.
  *
- * Crée si absents :
- *  - readme-truth.yml                        (template avec placeholders)
- *  - .github/workflows/readme_truth.yml      (workflow GitHub Actions)
+ * Creates if absent:
+ *  - readme-truth.yml                     (template with placeholders)
+ *  - .github/workflows/readme_truth.yml   (GitHub Actions workflow)
  *
- * Convention de nommage des sources de vérité :
- *   README_truth.adoc      → langue par défaut (ex: en)
- *   README_truth_fr.adoc   → français
- *   README_truth_de.adoc   → allemand
+ * Validates on every run:
+ *  - source.dir exists            → ERROR + build failure if not
+ *  - source.defaultLang empty     → INFO  + fallback to "en"
+ *  - output.imgDir empty          → INFO  + fallback to default
+ *  - git.token placeholder        → WARN  + continue
+ *  - GitHub remote reachability   → WARN  + continue
  *
- * Ne touche JAMAIS à un fichier déjà existant.
+ * Internal test property:
+ *  -Preadme.git.validator.mock=<RESULT>
+ *  Valid values: VALID, TOKEN_PLACEHOLDER, UNREACHABLE,
+ *                REPOSITORY_NOT_FOUND, INSUFFICIENT_PUSH_RIGHTS
  */
-@UntrackedTask(because = "Scaffolding — toujours vérifié mais jamais écrasé")
+@UntrackedTask(because = "Scaffolding — always checked, never overwritten")
 abstract class ScaffoldTask : DefaultTask() {
 
     @get:InputDirectory
@@ -28,24 +33,157 @@ abstract class ScaffoldTask : DefaultTask() {
 
     @TaskAction
     fun scaffold() {
-        val root = projectDir.get().asFile
+        val root   = projectDir.get().asFile
+        val config = ReadmePlantUmlConfig.load(root)
+
         scaffoldConfig(root)
         scaffoldWorkflow(root)
+        validateConfig(root, config)
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // readme-truth.yml
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── File creation ─────────────────────────────────────────────────────────
 
     private fun scaffoldConfig(root: File) {
-        val configFile = File(root, "readme-truth.yml")
+        val configFile = File(root, ReadmePlantUmlConfig.CONFIG_FILE_NAME)
 
         if (configFile.exists()) {
             logger.lifecycle("✔ readme-truth.yml already exists — skipped")
             return
         }
 
-        configFile.writeText("""
+        configFile.writeText(CONFIG_TEMPLATE)
+        logger.lifecycle("✔ readme-truth.yml created — fill in your token and add to GitHub Secrets")
+    }
+
+    private fun scaffoldWorkflow(root: File) {
+        val workflowDir  = File(root, ".github/workflows").also { it.mkdirs() }
+        val workflowFile = File(workflowDir, "readme_truth.yml")
+
+        if (workflowFile.exists()) {
+            logger.lifecycle("✔ .github/workflows/readme_truth.yml already exists — skipped")
+            return
+        }
+
+        workflowFile.writeText(WORKFLOW_TEMPLATE)
+        logger.lifecycle("✔ .github/workflows/readme_truth.yml created")
+        logger.lifecycle("  → commit this file to activate the CI workflow")
+    }
+
+    // ── Validation ────────────────────────────────────────────────────────────
+
+    private fun validateConfig(root: File, config: ReadmePlantUmlConfig) {
+        validateSourceDir(root, config)
+        validateDefaultLang(config)
+        validateImgDir(config)
+        validateGitConfig(config)
+    }
+
+    private fun validateSourceDir(root: File, config: ReadmePlantUmlConfig) {
+        val sourceDir = File(root, config.source.dir)
+        if (!sourceDir.exists()) {
+            logger.error(
+                "[ERROR] source.dir does not exist: ${config.source.dir}\n" +
+                        "→ Update 'source.dir' in readme-truth.yml to a valid path"
+            )
+            throw IllegalStateException(
+                "source.dir does not exist: ${config.source.dir}"
+            )
+        }
+        logger.lifecycle("✔ [INFO]  source.dir         — OK (${config.source.dir})")
+    }
+
+    private fun validateDefaultLang(config: ReadmePlantUmlConfig) {
+        if (config.source.defaultLang.isBlank()) {
+            logger.lifecycle(
+                "⚠ [INFO]  defaultLang is empty — falling back to default lang: en"
+            )
+        } else {
+            logger.lifecycle(
+                "✔ [INFO]  defaultLang        — OK (${config.source.defaultLang})"
+            )
+        }
+    }
+
+    private fun validateImgDir(config: ReadmePlantUmlConfig) {
+        if (config.output.imgDir.isBlank()) {
+            logger.lifecycle(
+                "⚠ [INFO]  imgDir is empty — falling back to default imgDir:" +
+                        " .github/workflows/readmes/images"
+            )
+        } else {
+            logger.lifecycle(
+                "✔ [INFO]  output.imgDir     — OK (${config.output.imgDir})"
+            )
+        }
+    }
+
+    private fun validateGitConfig(config: ReadmePlantUmlConfig) {
+        val validator = resolveMockValidator() ?: JGitRemoteValidator()
+        when (val result = validator.validate(config.git)) {
+            is GitValidationResult.Valid -> {
+                logger.lifecycle("✔ [INFO]  GitHub connection  — OK")
+                logger.lifecycle("✔ [INFO]  repository access  — OK")
+                logger.lifecycle("✔ [INFO]  push permission    — OK")
+            }
+            is GitValidationResult.TokenPlaceholder -> {
+                logger.warn(
+                    "[WARN]  git.token is still a placeholder — " +
+                            "replace <YOUR_GITHUB_PAT> with a real token\n" +
+                            "→ commitGeneratedReadme will fail until token is set"
+                )
+            }
+            is GitValidationResult.Unreachable -> {
+                logger.warn(
+                    "[WARN]  GitHub is unreachable — " +
+                            "remote validation skipped\n" +
+                            "→ processReadme remains fully operational"
+                )
+            }
+            is GitValidationResult.RepositoryNotFound -> {
+                logger.warn(
+                    "[WARN]  repository not found — " +
+                            "check git.repoUrl in readme-truth.yml\n" +
+                            "→ commitGeneratedReadme will fail"
+                )
+            }
+            is GitValidationResult.InsufficientPushRights -> {
+                logger.warn(
+                    "[WARN]  push — insufficient rights — " +
+                            "token does not have contents:write permission\n" +
+                            "→ commitGeneratedReadme will fail"
+                )
+            }
+        }
+    }
+
+    /**
+     * Resolves a mock validator from the internal test property.
+     * Returns null in production — JGitRemoteValidator is used instead.
+     *
+     * Internal test property: -Preadme.git.validator.mock=<RESULT>
+     */
+    private fun resolveMockValidator(): GitRemoteValidator? {
+        val mockValue = project.findProperty("readme.git.validator.mock")
+                as? String ?: return null
+
+        logger.lifecycle("[INFO] git remote validator mock active — result: $mockValue")
+
+        return GitRemoteValidator { _ ->
+            when (mockValue) {
+                "VALID"                    -> GitValidationResult.Valid
+                "TOKEN_PLACEHOLDER"        -> GitValidationResult.TokenPlaceholder
+                "UNREACHABLE"              -> GitValidationResult.Unreachable
+                "REPOSITORY_NOT_FOUND"     -> GitValidationResult.RepositoryNotFound
+                "INSUFFICIENT_PUSH_RIGHTS" -> GitValidationResult.InsufficientPushRights
+                else -> error("Unknown readme.git.validator.mock value: $mockValue")
+            }
+        }
+    }
+
+    // ── Templates ─────────────────────────────────────────────────────────────
+
+    companion object {
+        private val CONFIG_TEMPLATE = """
             # ─────────────────────────────────────────────────────────────────
             # readme-truth.yml — Plugin configuration
             #
@@ -73,28 +211,13 @@ abstract class ScaffoldTask : DefaultTask() {
               userEmail: "github-actions[bot]@users.noreply.github.com"
               commitMessage: "chore: generate readme [skip ci]"
               token: "<YOUR_GITHUB_PAT>"
+              repoUrl: ""
               watchedBranches:
                 - "main"
                 - "master"
-        """.trimIndent())
+        """.trimIndent()
 
-        logger.lifecycle("✔ readme-truth.yml created — fill in your token and add to GitHub Secrets")
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // .github/workflows/readme_truth.yml
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private fun scaffoldWorkflow(root: File) {
-        val workflowDir  = File(root, ".github/workflows").also { it.mkdirs() }
-        val workflowFile = File(workflowDir, "readme_truth.yml")
-
-        if (workflowFile.exists()) {
-            logger.lifecycle("✔ .github/workflows/readme_truth.yml already exists — skipped")
-            return
-        }
-
-        workflowFile.writeText("""
+        private val WORKFLOW_TEMPLATE = """
             name: Generate README from truth sources
 
             on:
@@ -120,10 +243,10 @@ abstract class ScaffoldTask : DefaultTask() {
                     with:
                       fetch-depth: 0
 
-                  - name: Set up JDK 25
+                  - name: Set up JDK 24
                     uses: actions/setup-java@v4
                     with:
-                      java-version: '25'
+                      java-version: '24'
                       distribution: 'temurin'
                       cache: gradle
 
@@ -144,9 +267,6 @@ abstract class ScaffoldTask : DefaultTask() {
                       git diff HEAD~1 --name-only 2>/dev/null | while read f; do
                         echo "- \`${'$'}f\`" >> ${'$'}GITHUB_STEP_SUMMARY
                       done || echo "- *(first run)*" >> ${'$'}GITHUB_STEP_SUMMARY
-        """.trimIndent())
-
-        logger.lifecycle("✔ .github/workflows/readme_truth.yml created")
-        logger.lifecycle("  → commit this file to activate the CI workflow")
+        """.trimIndent()
     }
 }
