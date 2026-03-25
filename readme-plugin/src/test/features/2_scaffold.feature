@@ -1,20 +1,153 @@
-Feature: Generate README from truth sources
+@cucumber @readme @scaffold
+Feature: Scaffold README configuration
 
-  Scenario: Process a single language README
-#    Given a project with a "README_truth.adoc" source file
-#    And the file contains a PlantUML diagram named "architecture"
-#    When I run "processReadme"
-#    Then "README.adoc" is generated
-#    And ".github/workflows/readmes/images/en/architecture.png" exists
-#    And "README.adoc" contains "image::...architecture.png"
+  Background:
+    Given a new ReadMe project
 
-  Scenario: Scaffold creates missing files
-#    Given a fresh project with no configuration
-#    When I run "scaffoldReadme"
-#    Then "readme-truth.yml" is created with placeholder token
-#    And ".github/workflows/readme_truth.yml" is created
+  # ── File creation ──────────────────────────────────────────────────────────
 
-  Scenario: Scaffold respects existing files
-#    Given a project with an existing "readme-truth.yml"
-#    When I run "scaffoldReadme"
-#    Then "readme-truth.yml" is unchanged
+  Scenario: scaffoldReadme creates readme-truth.yml when absent
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the following files should exist:
+      | file                                  |
+      | readme-truth.yml                      |
+      | .github/workflows/readme_truth.yml    |
+
+  # ── Default values ─────────────────────────────────────────────────────────
+
+  Scenario: generated readme-truth.yml contains expected source config
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the file "readme-truth.yml" should contain the following yaml values:
+      | key                  | value                                    |
+      | source.dir           | .                                        |
+      | source.defaultLang   | en                                       |
+
+  Scenario: generated readme-truth.yml contains expected output config
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the file "readme-truth.yml" should contain the following yaml values:
+      | key              | value                                    |
+      | output.imgDir    | .github/workflows/readmes/images         |
+
+  Scenario: generated readme-truth.yml contains expected git config
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the file "readme-truth.yml" should contain the following yaml values:
+      | key                  | value                                                      |
+      | git.userName         | github-actions[bot]                                        |
+      | git.userEmail        | github-actions[bot]@users.noreply.github.com               |
+      | git.commitMessage    | chore: generate readme [skip ci]                           |
+      | git.token            | <YOUR_GITHUB_PAT>                                          |
+    And the file "readme-truth.yml" should contain the following watched branches:
+      | branch  |
+      | main    |
+      | master  |
+
+  # ── Idempotence ────────────────────────────────────────────────────────────
+
+  Scenario: scaffoldReadme does not overwrite existing files
+    Given the following files already exist:
+      | file                                  | content               |
+      | readme-truth.yml                      | # existing config     |
+      | .github/workflows/readme_truth.yml    | # existing workflow   |
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the following files should still contain their original content:
+      | file                                  | content               |
+      | readme-truth.yml                      | # existing config     |
+      | .github/workflows/readme_truth.yml    | # existing workflow   |
+
+  # ── Fallback behavior ──────────────────────────────────────────────────────
+
+  Scenario: scaffold falls back to "en" when defaultLang is empty
+    Given a "readme-truth.yml" with the following yaml values:
+      | key                  | value |
+      | source.defaultLang   |       |
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword      | value  |
+      | INFO   | defaultLang  | en     |
+
+  Scenario: scaffold falls back to default imgDir when output.imgDir is empty
+    Given a "readme-truth.yml" with the following yaml values:
+      | key            | value |
+      | output.imgDir  |       |
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword  | value                             |
+      | INFO   | imgDir   | .github/workflows/readmes/images  |
+
+  # ── Blocking validation ────────────────────────────────────────────────────
+
+  Scenario: scaffold fails when source.dir does not exist
+    Given a "readme-truth.yml" with the following yaml values:
+      | key         | value              |
+      | source.dir  | /nonexistent/path  |
+    When I am executing the task "scaffoldReadme"
+    Then the build should fail
+    And the build log should contain the following entries:
+      | level  | keyword    | value       |
+      | ERROR  | source.dir | nonexistent |
+
+  # ── Git config warnings ────────────────────────────────────────────────────
+
+  Scenario: scaffold warns when token is still a placeholder
+    Given a "readme-truth.yml" with the following yaml values:
+      | key        | value              |
+      | git.token  | <YOUR_GITHUB_PAT>  |
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword  | value        |
+      | WARN   | token    | placeholder  |
+
+  Scenario: scaffold warns when GitHub is unreachable
+    Given a "readme-truth.yml" with the following yaml values:
+      | key        | value        |
+      | git.token  | ghp_valid    |
+    And the git remote validator is mocked with result "UNREACHABLE"
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword  | value        |
+      | WARN   | GitHub   | unreachable  |
+
+  Scenario: scaffold warns when repository does not exist
+    Given a "readme-truth.yml" with the following yaml values:
+      | key        | value      |
+      | git.token  | ghp_valid  |
+    And the git remote validator is mocked with result "REPOSITORY_NOT_FOUND"
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword     | value      |
+      | WARN   | repository  | not found  |
+
+  Scenario: scaffold warns when token has insufficient push rights
+    Given a "readme-truth.yml" with the following yaml values:
+      | key        | value      |
+      | git.token  | ghp_valid  |
+    And the git remote validator is mocked with result "INSUFFICIENT_PUSH_RIGHTS"
+    When I am executing the task "scaffoldReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level  | keyword  | value               |
+      | WARN   | push     | insufficient rights |
+
+  # ── Integration ────────────────────────────────────────────────────────────
+
+  Scenario: processReadme succeeds after scaffold with invalid git config
+    Given a "readme-truth.yml" with the following yaml values:
+      | key        | value             |
+      | git.token  | <YOUR_GITHUB_PAT> |
+    And the git remote validator is mocked with result "TOKEN_PLACEHOLDER"
+    And the file "README_truth.adoc" exists with content "= Hello"
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the following files should exist:
+      | file         |
+      | README.adoc  |
