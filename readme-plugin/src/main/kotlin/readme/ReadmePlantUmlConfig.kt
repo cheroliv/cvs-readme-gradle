@@ -20,7 +20,7 @@ import java.io.File
 data class ReadmePlantUmlConfig(
     val source: SourceConfig = SourceConfig(),
     val output: OutputConfig = OutputConfig(),
-    val git: GitConfig = GitConfig()
+    val git:    GitConfig    = GitConfig()
 ) {
     companion object {
 
@@ -54,7 +54,7 @@ data class ReadmePlantUmlConfig(
 }
 
 data class SourceConfig(
-    val dir: String = ".",
+    val dir:         String = ".",
     val defaultLang: String = "en"
 )
 
@@ -63,11 +63,11 @@ data class OutputConfig(
 )
 
 data class GitConfig(
-    val userName: String = "github-actions[bot]",
-    val userEmail: String = "github-actions[bot]@users.noreply.github.com",
-    val commitMessage: String = "chore: generate readme [skip ci]",
-    val token: String = "",
-    val watchedBranches: List<String> = listOf("main")
+    val userName:        String       = "github-actions[bot]",
+    val userEmail:       String       = "github-actions[bot]@users.noreply.github.com",
+    val commitMessage:   String       = "chore: generate readme [skip ci]",
+    val token:           String       = "",
+    val watchedBranches: List<String> = listOf("main", "master")
 ) {
     fun resolvedToken(): String =
         token.takeIf { it.isNotBlank() && it != "<YOUR_GITHUB_PAT>" }
