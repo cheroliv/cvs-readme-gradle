@@ -16,7 +16,7 @@ class ReadmePlantUmlConfigTest {
         assertEquals("en", config.source.defaultLang)
         assertEquals(".github/workflows/readmes/images", config.output.imgDir)
         assertEquals("github-actions[bot]", config.git.userName)
-        assertEquals(listOf("main"), config.git.watchedBranches)
+        assertEquals(listOf("main", "master"), config.git.watchedBranches)
     }
 
     @Test
@@ -47,6 +47,24 @@ class ReadmePlantUmlConfigTest {
         assertEquals("bot@example.com", config.git.userEmail)
         assertEquals("ghp_test_token",  config.git.token)
         assertEquals(listOf("develop", "release"), config.git.watchedBranches)
+    }
+
+    @Test
+    fun `load retourne les valeurs par defaut si fichier vide`(@TempDir tempDir: File) {
+        File(tempDir, "readme-truth.yml").writeText("")
+        val config = ReadmePlantUmlConfig.load(tempDir)
+
+        assertEquals(".", config.source.dir)
+        assertEquals("en", config.source.defaultLang)
+    }
+
+    @Test
+    fun `load retourne les valeurs par defaut si YAML invalide`(@TempDir tempDir: File) {
+        File(tempDir, "readme-truth.yml").writeText("# existing config")
+        val config = ReadmePlantUmlConfig.load(tempDir)
+
+        assertEquals(".", config.source.dir)
+        assertEquals("en", config.source.defaultLang)
     }
 
     @Test
