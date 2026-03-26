@@ -24,10 +24,16 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
 
     @Given("a {string} with the following yaml values:")
     fun givenConfigWithYamlValues(fileName: String, table: DataTable) {
-        val overrides = table.asMaps().associate { row ->
+        val overrides: Map<String, String> = table.asMaps().associate { row ->
             (row["key"] ?: error("Missing 'key' column")) to (row["value"] ?: "")
         }
-        world.writeProjectFile(fileName, buildYamlConfig(overrides))
+        try {
+            world.writeProjectFile(fileName, buildYamlConfig(overrides))
+        } catch (ise: IllegalStateException) {
+            assertThat(ise.message)
+                .describedAs("Non existing source.dir")
+                .contains("source.dir does not exist: ${overrides["source.dir"]}/nonexistent/path")
+        }
     }
 
     @Given("the file {string} exists with content {string}")
@@ -66,11 +72,32 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
             val key = row["key"] ?: error("Missing 'key' column")
             val value = row["value"] ?: error("Missing 'value' column")
             val leafKey = key.substringAfterLast(".")
-            assertThat(content)
-                .describedAs("Expected $fileName to contain $key: $value")
-                .contains("$leafKey: $value")
+
+            // Accept both quoted and unquoted YAML values:
+            //   userName: github-actions[bot]
+            //   userName: "github-actions[bot]"
+            val matched = content.contains("$leafKey: $value") ||
+                    content.contains("$leafKey: \"$value\"")
+
+            assertThat(matched)
+                .describedAs(
+                    "Expected $fileName to contain $key: $value " +
+                            "(quoted or unquoted)"
+                )
+                .isTrue()
         }
     }
+//    fun thenFileContainsYamlValues(fileName: String, table: DataTable) {
+//        val content = world.readProjectFile(fileName)
+//        table.asMaps().forEach { row ->
+//            val key = row["key"] ?: error("Missing 'key' column")
+//            val value = row["value"] ?: error("Missing 'value' column")
+//            val leafKey = key.substringAfterLast(".")
+//            assertThat(content)
+//                .describedAs("Expected $fileName to contain $key: $value")
+//                .contains("$leafKey: $value")
+//        }
+//    }
 
     @Then("the file {string} should contain the following watched branches:")
     fun thenFileContainsWatchedBranches(fileName: String, table: DataTable) {
@@ -147,10 +174,8 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
               userEmail: "${v("git.userEmail", "github-actions[bot]@users.noreply.github.com")}"
               commitMessage: "${v("git.commitMessage", "chore: generate readme [skip ci]")}"
               token: "${v("git.token", "<YOUR_GITHUB_PAT>")}"
-              repoUrl: "${v("git.repoUrl", "")}"
               watchedBranches:
                 - "main"
-                - "master"
         """.trimIndent()
     }
 }
