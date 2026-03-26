@@ -6,21 +6,21 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.io.File
 
 /**
- * Modèle Jackson 2.x — miroir exact de readme-truth.yml
+ * Jackson 2.x model — exact mirror of readme-truth.yml
  *
- * Le fichier readme-truth.yml N'EST PAS commité avec un vrai token.
- * Son contenu (token inclus) est stocké dans le secret GitHub
- * README_GRADLE_PLUGIN et écrit sur disque par la CI :
+ * readme-truth.yml is NEVER committed with a real token.
+ * Its content (token included) is stored in the GitHub secret
+ * README_GRADLE_PLUGIN and written to disk by CI:
  *
  *   echo "${{ secrets.README_GRADLE_PLUGIN }}" > readme-truth.yml
  *   ./gradlew -q -s commitGeneratedReadme
  *
- * TODO: migrer vers tools.jackson 3.x quand disponible en release stable
+ * TODO: migrate to tools.jackson 3.x when stable release is available
  */
 data class ReadmePlantUmlConfig(
     val source: SourceConfig = SourceConfig(),
     val output: OutputConfig = OutputConfig(),
-    val git:    GitConfig    = GitConfig()
+    val git: GitConfig = GitConfig()
 ) {
     companion object {
 
@@ -32,19 +32,29 @@ data class ReadmePlantUmlConfig(
         fun load(projectDir: File): ReadmePlantUmlConfig {
             val configFile = File(projectDir, CONFIG_FILE_NAME)
 
-            return if (configFile.exists()) {
+            // File absent or empty — fall back to defaults silently
+            if (!configFile.exists() || configFile.length() == 0L) {
+                return ReadmePlantUmlConfig()
+                    .also { println("[readme] No $CONFIG_FILE_NAME or empty file — using defaults") }
+            }
+
+            // File present but invalid YAML — warn and fall back to defaults
+            return try {
                 MAPPER.readValue(configFile, ReadmePlantUmlConfig::class.java)
-                    .also { println("[readme] Config chargée : ${configFile.absolutePath}") }
-            } else {
+                    .also { println("[readme] Config loaded: ${configFile.absolutePath}") }
+            } catch (e: Exception) {
+                println(
+                    "[readme] WARNING: $CONFIG_FILE_NAME contains invalid YAML — " +
+                            "using defaults (${e.message})"
+                )
                 ReadmePlantUmlConfig()
-                    .also { println("[readme] Pas de $CONFIG_FILE_NAME — valeurs par défaut") }
             }
         }
     }
 }
 
 data class SourceConfig(
-    val dir:         String = ".",
+    val dir: String = ".",
     val defaultLang: String = "en"
 )
 
@@ -55,16 +65,15 @@ data class OutputConfig(
 data class GitConfig(
     val userName: String = "github-actions[bot]",
     val userEmail: String = "github-actions[bot]@users.noreply.github.com",
+    val commitMessage: String = "chore: generate readme [skip ci]",
     val token: String = "",
-    val repoUrl: String = "",
-    val watchedBranches: List<String> = listOf("main"),
-    val commitMessage: String = "chore: generate readme [skip ci]"
+    val watchedBranches: List<String> = listOf("main")
 ) {
     fun resolvedToken(): String =
         token.takeIf { it.isNotBlank() && it != "<YOUR_GITHUB_PAT>" }
             ?: error(
-                "Le token GitHub est vide ou non remplacé dans readme-truth.yml.\n" +
-                        "→ Vérifiez le secret README_GRADLE_PLUGIN dans :\n" +
+                "GitHub token is empty or still a placeholder in readme-truth.yml.\n" +
+                        "→ Check the README_GRADLE_PLUGIN secret in :\n" +
                         "   GitHub → Settings → Secrets and variables → Actions"
             )
 }
