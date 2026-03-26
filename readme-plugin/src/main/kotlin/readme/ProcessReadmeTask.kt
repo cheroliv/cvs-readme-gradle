@@ -24,14 +24,19 @@ abstract class ProcessReadmeTask : DefaultTask() {
     @get:Input
     abstract val defaultLang: Property<String>
 
+    // Matches any AsciiDoc block delimiter of 4+ identical chars: ----, ````, ......
+    // Capture group 2 ensures opening and closing delimiter match exactly.
     private val plantUmlBlockRegex = Regex(
-        """\[plantuml,\s*([^,\]\s]+)[^\]]*]\s*\n(-{4})\n(.*?)\n\2""",
+        """\[plantuml,\s*([^,\]\s]+)[^\]]*]\s*\n(-{4,}|`{4,}|\.{4,})\n(.*?)\n\2""",
         RegexOption.DOT_MATCHES_ALL
     )
 
-    // Capture href="README_truth{_xx}.adoc" dans les blocs passthrough ++++
+    // Rewrites inter-language links in all three AsciiDoc forms:
+    //   href="README_truth_fr.adoc"    → href="README_fr.adoc"
+    //   link:README_truth_fr.adoc[...] → link:README_fr.adoc[...]
+    //   xref:README_truth_fr.adoc[...] → xref:README_fr.adoc[...]
     private val langLinkRegex = Regex(
-        """(href=")([^"]*README_truth(?:_[a-z]{2})?\.adoc)"""
+        """(href="|link:|xref:)([^"\[]*README_truth(?:_[a-z]{2})?\.adoc)"""
     )
 
     @TaskAction
@@ -40,7 +45,7 @@ abstract class ProcessReadmeTask : DefaultTask() {
         val sources = AdocSourceFile.scanDir(root)
 
         if (sources.isEmpty()) {
-            logger.warn("Aucun fichier README_truth*.adoc trouvé dans : ${root.absolutePath}")
+            logger.warn("No README_truth*.adoc file found in: ${root.absolutePath}")
             return
         }
 
@@ -58,7 +63,7 @@ abstract class ProcessReadmeTask : DefaultTask() {
 
         var diagramCount = 0
 
-        // ── Étape 1 : remplacement des blocs PlantUML ─────────────────────
+        // ── Step 1: replace PlantUML blocks ───────────────────────────────────
         val afterPlantuml = plantUmlBlockRegex.replace(content) { match ->
             val name = match.groupValues[1].trim()
             val body = match.groupValues[3]
@@ -72,14 +77,21 @@ abstract class ProcessReadmeTask : DefaultTask() {
             buildPng.copyTo(repoPng, overwrite = true)
             logger.lifecycle("║  COPY : ${repoPng.path}")
 
-            val relPath = "${imgDir.get().asFile.path}/${lang}/${name}.png"
-                .removePrefix("${src.file.parentFile.path}/")
+            // Compute path relative to the source file using Path.relativize()
+            // so it works correctly when the project is nested under the git root.
+            val relPath = src.file.parentFile.toPath()
+                .relativize(
+                    File(imgDir.get().asFile, "$lang/${name}.png").toPath()
+                )
+                .toString()
+                .replace('\\', '/')  // normalize separators on Windows
+
             "image::${relPath}[${name}]"
         }
 
-        // ── Étape 2 : réécriture des liens inter-langues ───────────────────
-        // README_truth.adoc    → href="README_truth_fr.adoc" → href="README_fr.adoc"
-        // README_truth_fr.adoc → href="README_truth.adoc"    → href="README.adoc"
+        // ── Step 2: rewrite inter-language links ──────────────────────────────
+        // README_truth.adoc    → link:README_truth_fr.adoc → link:README_fr.adoc
+        // README_truth_fr.adoc → link:README_truth.adoc    → link:README.adoc
         val rewritten = langLinkRegex.replace(afterPlantuml) { match ->
             val prefix       = match.groupValues[1]
             val linkedSource = match.groupValues[2]
@@ -90,7 +102,7 @@ abstract class ProcessReadmeTask : DefaultTask() {
             "${prefix}${generatedName}"
         }
 
-        // ── Étape 3 : écriture du fichier généré ──────────────────────────
+        // ── Step 3: write generated file ──────────────────────────────────────
         val generated = src.generatedFile()
         generated.writeText(rewritten)
 
@@ -103,11 +115,8 @@ abstract class ProcessReadmeTask : DefaultTask() {
         else "@startuml\n$body\n@enduml"
 
         val reader = SourceStringReader(src)
-        val fos    = FileOutputStream(output)
-        try {
+        FileOutputStream(output).use { fos ->
             reader.outputImage(fos)
-        } finally {
-            fos.close()
         }
     }
 }
