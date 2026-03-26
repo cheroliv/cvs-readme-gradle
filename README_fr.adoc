@@ -7,7 +7,7 @@
 
 ++++
 <p align="right">
-  <a href="README_truth.adoc">
+  <a href="README.adoc">
     <img src=".github/workflows/readmes/images/lang-en-blue.svg" alt="English" width="64"/>
   </a>
 </p>
@@ -25,56 +25,14 @@ Un bloc `[plantuml]` affiché tel quel sur github.com n'est pas rendu en image.
 
 Ce plugin automatise la transformation via GitHub Actions :
 
-[plantuml, problem-solution, png]
-----
-@startuml
-skinparam componentStyle rectangle
-
-package "Ce que tu écris" {
-  [README_plantuml.adoc\n(blocs plantuml natifs)] as src #LightGreen
-}
-
-package "Ce que GitHub affiche" {
-  [README.adoc\n(image::...png références)] as out #LightBlue
-}
-
-package "Ce que le visiteur voit" {
-  [Diagrammes rendus\ndans le navigateur] as web #LightYellow
-}
-
-src --> out : plugin génère\n(GitHub Actions)
-out --> web : GitHub rend\nnativement
-@enduml
-----
+image::.github/workflows/readmes/images/fr/problem-solution.png[problem-solution]
 
 == 2. Philosophie : source de vérité unique
 
 `README_plantuml.adoc` est le **seul fichier que tu édites**.
 `README.adoc` est un artefact généré — jamais édité à la main.
 
-[plantuml, source-of-truth, png]
-----
-@startuml
-skinparam defaultTextAlignment center
-
-rectangle "Tu édites" #LightGreen {
-  file "README_plantuml.adoc" as src
-  file "README_plantuml_fr.adoc" as srcFr
-}
-
-rectangle "CI génère" #LightBlue {
-  file "README.adoc" as out
-  file "README_fr.adoc" as outFr
-  folder ".github/workflows/readmes/images/en/" as imgEn
-  folder ".github/workflows/readmes/images/fr/" as imgFr
-}
-
-src --> out
-src --> imgEn
-srcFr --> outFr
-srcFr --> imgFr
-@enduml
-----
+image::.github/workflows/readmes/images/fr/source-of-truth.png[source-of-truth]
 
 === Convention de nommage multilingue
 
@@ -101,239 +59,25 @@ srcFr --> imgFr
 
 === Vue d'ensemble
 
-[plantuml, overview-sequence, png]
-----
-@startuml
-actor Developer
-participant "GitHub" as GH
-participant "GitHub Actions" as CI
-participant "processReadme\n(Gradle Task)" as proc
-participant "commitGeneratedReadme\n(Gradle Task)" as commit
-participant "JGit" as jgit
-
-Developer -> GH : git push README_plantuml*.adoc
-GH -> CI : déclenche workflow
-CI -> proc : ./gradlew commitGeneratedReadme
-proc -> proc : détecte blocs [plantuml,name,...]
-proc -> proc : génère .github/workflows/readmes/\nimages/{lang}/name.png
-proc -> proc : réécrit README.adoc\navec image::...png[]
-proc -> commit : dependsOn résolu
-commit -> jgit : git add + commit + push
-jgit -> GH : README.adoc + images commités
-GH --> Developer : README visible ✓
-@enduml
-----
+image::.github/workflows/readmes/images/fr/overview-sequence.png[overview-sequence]
 
 === Diagramme d'activité
 
-[plantuml, activity, png]
-----
-@startuml
-start
-
-:Lecture de readme-plantuml.yml\n(injecté depuis le secret CI);
-
-:Scan des README_plantuml*.adoc\ndans sourceDir;
-
-if (Fichiers trouvés ?) then (non)
-  :Warning — aucun fichier source;
-  stop
-else (oui)
-  :Détection de la langue\ndepuis le suffixe _xx;
-endif
-
-repeat
-  :Extraction des blocs\n[plantuml, name, ...];
-
-  if (Blocs trouvés ?) then (oui)
-    repeat
-      :Génération PNG\nbuild/img/{lang}/name.png;
-      :Copie vers\n.github/workflows/readmes/images/{lang}/;
-      :Remplacement du bloc par\nimage::.github/.../name.png[name];
-    repeat while (autres blocs ?)
-  endif
-
-  :Écriture README{_lang}.adoc;
-repeat while (autres fichiers source ?)
-
-:git add README*.adoc\n+ .github/workflows/readmes/images/;
-:git commit + push\nvia JGit (sans git système);
-
-stop
-@enduml
-----
+image::.github/workflows/readmes/images/fr/activity.png[activity]
 
 == 4. Architecture interne
 
 === Composants
 
-[plantuml, components, png]
-----
-@startuml
-skinparam componentStyle rectangle
-
-package "asciidoc-plantuml-readme-plugin" {
-
-  package "config" {
-    [ReadmePlantUmlConfig] as cfg
-    [SourceConfig] as scfg
-    [OutputConfig] as ocfg
-    [GitConfig] as gcfg
-  }
-
-  package "model" {
-    [AdocSourceFile] as adocModel
-  }
-
-  package "tasks" {
-    [ProcessReadmeTask] as proc
-    [CommitGeneratedReadmeTask] as commit
-  }
-
-  [ReadmePlantUmlPlugin] as plugin
-
-}
-
-package "Dépendances externes" {
-  [PlantUML Engine] as puml
-  [JGit] as jgit
-  [Jackson YAML\n(Jakarta)] as jackson
-}
-
-plugin --> proc
-plugin --> commit
-plugin --> cfg
-
-cfg --> jackson
-proc --> adocModel
-proc --> puml
-commit --> jgit
-@enduml
-----
+image::.github/workflows/readmes/images/fr/components.png[components]
 
 === Diagramme de classes
 
-[plantuml, class-diagram, png]
-----
-@startuml
-skinparam classAttributeIconSize 0
-
-class ReadmePlantUmlPlugin {
-  +apply(project: Project)
-}
-
-class ReadmePlantUmlConfig {
-  +source: SourceConfig
-  +output: OutputConfig
-  +git: GitConfig
-  {static} +load(projectDir: File): ReadmePlantUmlConfig
-}
-
-class SourceConfig {
-  +dir: String = "."
-  +defaultLang: String = "en"
-}
-
-class OutputConfig {
-  +imgDir: String = ".github/workflows/readmes/images"
-}
-
-class GitConfig {
-  +userName: String
-  +userEmail: String
-  +commitMessage: String
-  +token: String
-  +watchedBranches: List<String>
-  +resolvedToken(): String
-}
-
-class AdocSourceFile {
-  +file: File
-  +baseName: String
-  +lang: String?
-  +effectiveLang(default: String): String
-  +generatedFileName(): String
-  +generatedFile(): File
-  {static} +isSourceOfTruth(file: File): Boolean
-  {static} +scanDir(dir: File): List<AdocSourceFile>
-}
-
-abstract class ProcessReadmeTask {
-  +sourceDir: DirectoryProperty
-  +imgDir: DirectoryProperty
-  +buildImgDir: DirectoryProperty
-  +defaultLang: Property<String>
-  +process()
-}
-
-abstract class CommitGeneratedReadmeTask {
-  +repoDir: DirectoryProperty
-  +gitUserName: Property<String>
-  +gitUserEmail: Property<String>
-  +commitMessage: Property<String>
-  +gitToken: Property<String>
-  +commitAndPush()
-}
-
-ReadmePlantUmlPlugin --> ReadmePlantUmlConfig : charge
-ReadmePlantUmlPlugin --> ProcessReadmeTask : enregistre
-ReadmePlantUmlPlugin --> CommitGeneratedReadmeTask : enregistre
-
-ReadmePlantUmlConfig *-- SourceConfig
-ReadmePlantUmlConfig *-- OutputConfig
-ReadmePlantUmlConfig *-- GitConfig
-
-ProcessReadmeTask --> AdocSourceFile : scan + traite
-CommitGeneratedReadmeTask --> ProcessReadmeTask : dependsOn
-@enduml
-----
+image::.github/workflows/readmes/images/fr/class-diagram.png[class-diagram]
 
 === Architecture hexagonale
 
-[plantuml, hexagonal, png]
-----
-@startuml
-
-package "Driving Adapters" {
-  [ProcessReadmeTask] as proc
-  [CommitGeneratedReadmeTask] as commit
-}
-
-package "Application Core" {
-  [ReadmePlantUmlPlugin] as core
-  [ReadmePlantUmlConfig] as cfg
-}
-
-package "Domain" {
-  [AdocSourceFile] as domain
-}
-
-package "Ports" {
-  interface FilePort
-  interface DiagramPort
-  interface GitPort
-}
-
-package "Driven Adapters" {
-  [FileSystem] as fs
-  [PlantUML Engine] as puml
-  [JGit] as jgit
-}
-
-proc --> core
-commit --> core
-core --> cfg
-core --> domain
-
-core --> FilePort
-core --> DiagramPort
-core --> GitPort
-
-FilePort <.. fs
-DiagramPort <.. puml
-GitPort <.. jgit
-@enduml
-----
+image::.github/workflows/readmes/images/fr/hexagonal.png[hexagonal]
 
 == 5. Installation
 
