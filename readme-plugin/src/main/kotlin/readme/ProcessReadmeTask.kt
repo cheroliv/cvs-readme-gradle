@@ -61,6 +61,8 @@ abstract class ProcessReadmeTask : DefaultTask() {
         val buildLangDir = File(buildImgDir.get().asFile, lang).also { it.mkdirs() }
         val repoLangDir  = File(imgDir.get().asFile,      lang).also { it.mkdirs() }
 
+        // Track seen diagram names to detect duplicates within this file
+        val seenDiagramNames = mutableSetOf<String>()
         var diagramCount = 0
 
         // ── Step 1: replace PlantUML blocks ───────────────────────────────────
@@ -69,9 +71,22 @@ abstract class ProcessReadmeTask : DefaultTask() {
             val body = match.groupValues[3]
             diagramCount++
 
+            // Warn on duplicate diagram name within the same source file
+            if (!seenDiagramNames.add(name)) {
+                logger.warn(
+                    "[WARN]  $name — duplicate diagram name in ${src.file.name}, " +
+                            "previous PNG will be overwritten"
+                )
+            }
+
             val buildPng = File(buildLangDir, "${name}.png")
-            generatePng(body, buildPng)
+            val generated = generatePng(body, buildPng, name)
             logger.lifecycle("║  PNG  : ${buildPng.path}")
+
+            if (!generated) {
+                // generatePng logged the warning already — skip copy and image:: replacement
+                return@replace match.value
+            }
 
             val repoPng = File(repoLangDir, "${name}.png")
             buildPng.copyTo(repoPng, overwrite = true)
@@ -96,6 +111,15 @@ abstract class ProcessReadmeTask : DefaultTask() {
             val prefix       = match.groupValues[1]
             val linkedSource = match.groupValues[2]
 
+            // Warn if the linked truth file does not exist in the project
+            val linkedFile = File(src.file.parentFile, linkedSource)
+            if (!linkedFile.exists()) {
+                logger.warn(
+                    "[WARN]  $linkedSource does not exist — " +
+                            "link rewritten but target truth file is missing"
+                )
+            }
+
             val generatedName = AdocSourceFile(File(linkedSource)).generatedFileName()
 
             logger.lifecycle("║  LINK : $linkedSource → $generatedName")
@@ -110,13 +134,28 @@ abstract class ProcessReadmeTask : DefaultTask() {
         logger.lifecycle("╚═════════════════════════════════════════")
     }
 
-    private fun generatePng(body: String, output: File) {
+    /**
+     * Generates a PNG from [body] into [output].
+     * Returns true on success, false if PlantUML reported an error.
+     * Logs a warning with the diagram name and error description on failure.
+     */
+    private fun generatePng(body: String, output: File, name: String): Boolean {
         val src = if (body.trim().startsWith("@startuml")) body
         else "@startuml\n$body\n@enduml"
 
         val reader = SourceStringReader(src)
-        FileOutputStream(output).use { fos ->
-            reader.outputImage(fos)
+        return FileOutputStream(output).use { fos ->
+            val description = reader.outputImage(fos)?.description
+            if (description != null &&
+                description.contains("error", ignoreCase = true)
+            ) {
+                logger.warn(
+                    "[WARN]  $name — invalid PlantUML syntax: $description"
+                )
+                false
+            } else {
+                true
+            }
         }
     }
 }
