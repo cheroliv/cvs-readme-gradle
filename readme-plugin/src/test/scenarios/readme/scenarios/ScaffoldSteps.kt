@@ -150,7 +150,7 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Builds a minimal valid readme-truth.yml overriding specific dot-notation keys.
+     * Builds a minimal valid readme.yml overriding specific dot-notation keys.
      * All fields default to the plugin's standard conventions.
      * repoUrl is intentionally omitted — resolved programmatically from .git config.
      */
