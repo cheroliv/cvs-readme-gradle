@@ -19,7 +19,7 @@ class ReadmePlugin : Plugin<Project> {
             ScaffoldTask::class.java
         ) { task ->
             task.group       = "documentation"
-            task.description = "Creates readme-truth.yml and .github/workflows/readme_truth.yml if absent"
+            task.description = "Creates readme.yml and .github/workflows/readme_action.yml if absent"
             task.projectDir  .set(project.layout.projectDirectory)
         }
 
