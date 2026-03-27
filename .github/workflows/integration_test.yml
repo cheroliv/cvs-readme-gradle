@@ -1,0 +1,44 @@
+name: Integration Test — commitGeneratedReadme
+
+on:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Run @integration Cucumber scenarios
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 24
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Inject plugin config from secret
+        run: echo "${{ secrets.README_GRADLE_PLUGIN }}" > readme.yml
+
+      - name: Run integration tests
+        run: |
+          ./gradlew -p readme-plugin cucumberTest \
+            -Dcucumber.filter.tags="@integration" \
+            --no-daemon
+
+      - name: Upload Cucumber report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-integration-report
+          path: readme-plugin/build/reports/cucumber.*
