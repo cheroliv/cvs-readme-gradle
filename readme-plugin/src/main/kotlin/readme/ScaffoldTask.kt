@@ -74,7 +74,7 @@ abstract class ScaffoldTask : DefaultTask() {
     private fun validateConfig(root: File, config: ReadmePlantUmlConfig) {
         validateSourceDir(root, config)
         validateDefaultLang(config)
-        validateImgDir(config)
+        validateImgDir(root, config)
         validateGitConfig(config)
     }
 
@@ -83,7 +83,7 @@ abstract class ScaffoldTask : DefaultTask() {
         if (!sourceDir.exists()) {
             logger.error(
                 "[ERROR] source.dir does not exist: ${config.source.dir}\n" +
-                        "→ Update 'source.dir' in readme-truth.yml to a valid path"
+                "→ Update 'source.dir' in readme-truth.yml to a valid path"
             )
             throw IllegalStateException(
                 "source.dir does not exist: ${config.source.dir}"
@@ -104,17 +104,40 @@ abstract class ScaffoldTask : DefaultTask() {
         }
     }
 
-    private fun validateImgDir(config: ReadmePlantUmlConfig) {
+    private fun validateImgDir(root: File, config: ReadmePlantUmlConfig) {
         if (config.output.imgDir.isBlank()) {
             logger.lifecycle(
                 "⚠ [INFO]  imgDir is empty — falling back to default imgDir:" +
-                        " .github/workflows/readmes/images"
+                " .github/workflows/readmes/images"
             )
-        } else {
-            logger.lifecycle(
-                "✔ [INFO]  output.imgDir     — OK (${config.output.imgDir})"
+            return
+        }
+
+        val resolvedImgDir = GitUtils.resolveImgDir(root, config.output.imgDir)
+
+        // Attempt to create the directory if it does not exist yet
+        if (!resolvedImgDir.exists() && !resolvedImgDir.mkdirs()) {
+            logger.error(
+                "[ERROR] output.imgDir cannot be created: ${resolvedImgDir.absolutePath}\n" +
+                "→ Check parent directory permissions"
+            )
+            throw IllegalStateException(
+                "output.imgDir cannot be created: ${resolvedImgDir.absolutePath}"
             )
         }
+
+        // Verify the directory is writable
+        if (!resolvedImgDir.canWrite()) {
+            logger.error(
+                "[ERROR] output.imgDir is not writable: ${resolvedImgDir.absolutePath}\n" +
+                "→ Check directory permissions"
+            )
+            throw IllegalStateException(
+                "output.imgDir is not writable: ${resolvedImgDir.absolutePath}"
+            )
+        }
+
+        logger.lifecycle("✔ [INFO]  output.imgDir     — OK (${config.output.imgDir})")
     }
 
     private fun validateGitConfig(config: ReadmePlantUmlConfig) {
@@ -128,29 +151,29 @@ abstract class ScaffoldTask : DefaultTask() {
             is GitValidationResult.TokenPlaceholder -> {
                 logger.warn(
                     "[WARN]  git.token is still a placeholder — " +
-                            "replace <YOUR_GITHUB_PAT> with a real token\n" +
-                            "→ commitGeneratedReadme will fail until token is set"
+                    "replace <YOUR_GITHUB_PAT> with a real token\n" +
+                    "→ commitGeneratedReadme will fail until token is set"
                 )
             }
             is GitValidationResult.Unreachable -> {
                 logger.warn(
                     "[WARN]  GitHub is unreachable — " +
-                            "remote validation skipped\n" +
-                            "→ processReadme remains fully operational"
+                    "remote validation skipped\n" +
+                    "→ processReadme remains fully operational"
                 )
             }
             is GitValidationResult.RepositoryNotFound -> {
                 logger.warn(
                     "[WARN]  repository not found — " +
-                            "check the origin remote in your local .git config\n" +
-                            "→ commitGeneratedReadme will fail"
+                    "check the origin remote in your local .git config\n" +
+                    "→ commitGeneratedReadme will fail"
                 )
             }
             is GitValidationResult.InsufficientPushRights -> {
                 logger.warn(
                     "[WARN]  push — insufficient rights — " +
-                            "token does not have contents:write permission\n" +
-                            "→ commitGeneratedReadme will fail"
+                    "token does not have contents:write permission\n" +
+                    "→ commitGeneratedReadme will fail"
                 )
             }
         }
@@ -164,7 +187,7 @@ abstract class ScaffoldTask : DefaultTask() {
      */
     private fun resolveMockValidator(): GitRemoteValidator? {
         val mockValue = project.findProperty("readme.git.validator.mock")
-                as? String ?: return null
+            as? String ?: return null
 
         logger.lifecycle("[INFO] git remote validator mock active — result: $mockValue")
 
