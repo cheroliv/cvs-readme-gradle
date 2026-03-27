@@ -38,74 +38,58 @@ abstract class CommitGeneratedReadmeTask : DefaultTask() {
         // Activated via -Preadme.commit.mock=true in tests.
         if (isCommitMock()) {
             logger.lifecycle("[INFO] commit mock active — local commit only, push skipped")
-            commitLocal(root)
+            Git.open(root).use { git ->
+                if (stageAndCommit(git)) {
+                    logger.lifecycle("[mock] Push skipped — commit created locally only.")
+                }
+            }
             return
         }
 
         // Token is resolved lazily here — only in non-mock production path.
-        val token = gitToken.get()
-        val credentials = UsernamePasswordCredentialsProvider("x-access-token", token)
+        val credentials = UsernamePasswordCredentialsProvider("x-access-token", gitToken.get())
 
         Git.open(root).use { git ->
-            val status = git.status().call()
-
-            if (!hasReadmeChanges(status)) {
-                logger.lifecycle("Aucun fichier généré à commiter — dépôt propre.")
-                return
+            if (stageAndCommit(git)) {
+                // ← setCredentialsProvider() méthode publique, pas accès direct au field
+                git.push()
+                    .setCredentialsProvider(credentials)
+                    .call()
+                logger.lifecycle("Push effectué avec succès.")
             }
-
-            logChangedFiles(status)
-
-            git.add().apply {
-                addFilepattern("README*.adoc")
-                addFilepattern(".github/workflows/readmes/images/")
-            }.call()
-
-            git.commit().apply {
-                message = commitMessage.get()
-                setAuthor(gitUserName.get(), gitUserEmail.get())
-                setCommitter(gitUserName.get(), gitUserEmail.get())
-            }.call()
-
-            logger.lifecycle("Commit : \"${commitMessage.get()}\"")
-
-            git.push()
-                .setCredentialsProvider(credentials)
-                .call()
-
-            logger.lifecycle("Push effectué avec succès.")
         }
     }
 
     /**
-     * Local-only commit — same logic as production but without push.
-     * Used in tests via -Preadme.commit.mock=true.
+     * Stages README*.adoc and images, then commits.
+     * Returns true if a commit was created, false if the repo had no README changes.
+     *
+     * Shared by both the production path (with push) and the mock path (without push)
+     * to avoid duplicating the status check, staging, and commit logic.
      */
-    private fun commitLocal(root: java.io.File) {
-        Git.open(root).use { git ->
-            val status = git.status().call()
+    private fun stageAndCommit(git: Git): Boolean {
+        val status = git.status().call()
 
-            if (!hasReadmeChanges(status)) {
-                logger.lifecycle("Aucun fichier généré à commiter — dépôt propre.")
-                return
-            }
-
-            logChangedFiles(status)
-
-            git.add().apply {
-                addFilepattern("README*.adoc")
-                addFilepattern(".github/workflows/readmes/images/")
-            }.call()
-
-            git.commit().apply {
-                message = commitMessage.get()
-                setAuthor(gitUserName.get(), gitUserEmail.get())
-                setCommitter(gitUserName.get(), gitUserEmail.get())
-            }.call()
-
-            logger.lifecycle("Commit : \"${commitMessage.get()}\"")
-            logger.lifecycle("[mock] Push skipped — commit created locally only.")
+        if (!hasReadmeChanges(status)) {
+            logger.lifecycle("Aucun fichier généré à commiter — dépôt propre.")
+            return false
         }
+
+        logChangedFiles(status)
+
+        git.add().apply {
+            addFilepattern("README*.adoc")
+            addFilepattern(".github/workflows/readmes/images/")
+        }.call()
+
+        git.commit().apply {
+            message = commitMessage.get()
+            setAuthor(gitUserName.get(), gitUserEmail.get())
+            setCommitter(gitUserName.get(), gitUserEmail.get())
+        }.call()
+
+        logger.lifecycle("Commit : \"${commitMessage.get()}\"")
+        return true
     }
 
     /**
