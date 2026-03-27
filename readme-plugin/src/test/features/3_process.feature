@@ -270,6 +270,27 @@ Feature: Process README truth sources
       | level | keyword      | value |
       | WARN  | README_truth | found |
 
+  # ── Deterministic processing order ────────────────────────────────────────
+
+  Scenario: processReadme processes source files in alphabetical order
+    # Files are created in reverse alphabetical order (fr before en) to expose
+    # non-deterministic listFiles() behaviour — the test fails without sortedBy.
+    Given the file "README_truth_fr.adoc" exists with the following content:
+      """
+      = Français
+      """
+    And the file "README_truth.adoc" exists with the following content:
+      """
+      = English
+      """
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level | keyword           | value |
+      | ╔═    | README_truth.adoc | lang  |
+      | ╔═    | README_truth_fr   | lang  |
+    And the build log should contain "README_truth.adoc" before "README_truth_fr.adoc"
+
   # ── Robustness ────────────────────────────────────────────────────────────
 
   Scenario: processReadme warns when inter-language link targets a non-existent truth file
@@ -320,6 +341,30 @@ Feature: Process README truth sources
     And the build log should contain the following entries:
       | level | keyword | value   |
       | WARN  | broken  | invalid |
+    And the file "README.adoc" should contain "[plantuml, broken, png]"
+    And the file "README.adoc" should not contain "image::"
+
+  Scenario: processReadme preserves invalid PlantUML block in generated file
+    Given the file "README_truth.adoc" exists with the following content:
+      """
+      = Test
+
+      Some intro text.
+
+      [plantuml, broken, png]
+      ----
+      @@@invalid syntax@@@
+      ----
+
+      Some trailing text.
+      """
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the file "README.adoc" should contain "Some intro text."
+    And the file "README.adoc" should contain "[plantuml, broken, png]"
+    And the file "README.adoc" should contain "@@@invalid syntax@@@"
+    And the file "README.adoc" should contain "Some trailing text."
+    And the file "README.adoc" should not contain "image::"
 
   Scenario: processReadme logs each processed source file
     Given the file "README_truth.adoc" exists with the following content:
@@ -376,3 +421,65 @@ Feature: Process README truth sources
     And the build log should contain the following entries:
       | level     | keyword | value   |
       | OUT   | 0       | diagram |
+
+  Scenario: processReadme warns and skips a README_truth file that is not readable
+    Given the file "README_truth.adoc" exists with the following content:
+      """
+      = English
+      """
+    And the file "README_truth_fr.adoc" exists with the following content:
+      """
+      = Français
+      """
+    And the file "README_truth.adoc" is not readable
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level | keyword           | value    |
+      | WARN  | README_truth.adoc | readable |
+    And the file "README_fr.adoc" should exist
+
+  Scenario: processReadme handles a diagram name with spaces gracefully
+    Given the file "README_truth.adoc" exists with the following content:
+      """
+      = Test
+      [plantuml, "my diagram", png]
+      ----
+      Alice -> Bob : hello
+      ----
+      """
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the file "README.adoc" should contain "image::"
+    And the following files should exist:
+      | file                                                |
+      | .github/workflows/readmes/images/en/my diagram.png |
+
+  Scenario: processReadme warns and skips when generated README.adoc is read-only
+    Given the file "README_truth.adoc" exists with the following content:
+      """
+      = English
+      """
+    And the generated file "README.adoc" is read-only
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level | keyword     | value     |
+      | WARN  | README.adoc | read-only |
+
+  Scenario: processReadme skips read-only target but processes other sources
+    Given the file "README_truth.adoc" exists with the following content:
+      """
+      = English
+      """
+    And the file "README_truth_fr.adoc" exists with the following content:
+      """
+      = Français
+      """
+    And the generated file "README.adoc" is read-only
+    When I am executing the task "processReadme"
+    Then the build should succeed
+    And the build log should contain the following entries:
+      | level | keyword     | value     |
+      | WARN  | README.adoc | read-only |
+    And the file "README_fr.adoc" should exist
