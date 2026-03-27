@@ -3,7 +3,7 @@ Feature: Process README truth sources
 
   Background:
     Given a new ReadMe project
-    And a "readme-truth.yml" with the following yaml values:
+    And a "readme.yml" with the following yaml values:
       | key       | value             |
       | git.token | <YOUR_GITHUB_PAT> |
     And the git remote validator is mocked with result "TOKEN_PLACEHOLDER"
