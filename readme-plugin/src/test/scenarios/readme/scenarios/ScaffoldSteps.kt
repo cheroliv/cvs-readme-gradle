@@ -35,6 +35,15 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
         world.writeProjectFile(relativePath, content)
     }
 
+    @Given("the directory {string} exists and is not writable")
+    fun givenDirectoryExistsAndIsNotWritable(relativePath: String) {
+        require(world.projectDir != null) { "Project directory must be initialized" }
+        val dir = java.io.File(world.projectDir, relativePath).also { it.mkdirs() }
+        dir.setWritable(false)
+        // Register for cleanup — must restore writable before deleteRecursively()
+        world.nonWritableDirs.add(dir)
+    }
+
     @Given("the git remote validator is mocked with result {string}")
     fun givenGitRemoteValidatorMocked(result: String) {
         world.gitValidatorMockResult = result
@@ -71,12 +80,12 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
             //   userName: github-actions[bot]
             //   userName: "github-actions[bot]"
             val matched = content.contains("$leafKey: $value") ||
-                    content.contains("$leafKey: \"$value\"")
+                          content.contains("$leafKey: \"$value\"")
 
             assertThat(matched)
                 .describedAs(
                     "Expected $fileName to contain $key: $value " +
-                            "(quoted or unquoted)"
+                    "(quoted or unquoted)"
                 )
                 .isTrue()
         }
@@ -130,7 +139,7 @@ class ScaffoldSteps(private val world: ReadMeWorld) {
             assertThat(output)
                 .describedAs(
                     "Expected log to contain [$level] with keyword '$keyword' " +
-                            "and value '$value'"
+                    "and value '$value'"
                 )
                 .containsIgnoringCase(level)
                 .containsIgnoringCase(keyword)
