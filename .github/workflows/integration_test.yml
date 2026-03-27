@@ -42,3 +42,6 @@ jobs:
         with:
           name: cucumber-integration-report
           path: readme-plugin/build/reports/cucumber.*
+
+      - name: Inject plugin config from secret
+        run: echo "${{ secrets.README_GRADLE_PLUGIN }}" > readme-plugin/readme.yml
